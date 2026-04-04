@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Mic, Users, FileText, Clock, Plus, ArrowRight } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { usePatients } from '@/hooks/usePatients'
 import { formatDate } from '@/lib/utils'
 
 const containerVariants = {
@@ -19,16 +20,19 @@ const itemVariants = {
   show: { opacity: 1, y: 0 },
 }
 
-const STATS = [
-  { label: 'Consultations ce mois', value: '0', icon: Mic, color: 'text-apex-primary' },
-  { label: 'Documents générés', value: '0', icon: FileText, color: 'text-apex-secondary' },
-  { label: 'Temps économisé', value: '0 min', icon: Clock, color: 'text-apex-accent' },
-]
-
 export default function DashboardPage() {
   const practitioner = useAuthStore((s) => s.practitioner)
+  const { data: patientsData } = usePatients('', 0, 1)
 
+  const patientCount = patientsData?.total ?? 0
   const today = formatDate(new Date())
+
+  const STATS = [
+    { label: 'Patients', value: String(patientCount), icon: Users, color: 'text-apex-primary', href: '/dashboard/patients' },
+    { label: 'Consultations ce mois', value: '0', icon: Mic, color: 'text-apex-secondary', href: undefined },
+    { label: 'Documents générés', value: '0', icon: FileText, color: 'text-apex-accent', href: undefined },
+    { label: 'Temps économisé', value: '0 min', icon: Clock, color: 'text-apex-text-muted', href: undefined },
+  ]
 
   return (
     <motion.div
@@ -47,19 +51,29 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Statistiques */}
-      <motion.div variants={itemVariants} className="grid grid-cols-3 gap-4">
-        {STATS.map((stat) => (
-          <div
-            key={stat.label}
-            className="glass rounded-apex-lg p-6 border border-apex-border hover:border-apex-primary/30 transition-colors"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <stat.icon size={20} className={stat.color} />
-            </div>
-            <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
-            <p className="text-sm text-apex-text-muted">{stat.label}</p>
-          </div>
-        ))}
+      <motion.div variants={itemVariants} className="grid grid-cols-4 gap-4">
+        {STATS.map((stat) => {
+          const Wrapper = stat.href ? Link : 'div'
+          const wrapperProps = stat.href ? { href: stat.href } : {}
+          return (
+            <Wrapper
+              key={stat.label}
+              {...(wrapperProps as any)}
+            >
+              <div
+                className={`glass rounded-apex-lg p-6 border border-apex-border transition-colors ${
+                  stat.href ? 'hover:border-apex-primary/30 cursor-pointer' : ''
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <stat.icon size={20} className={stat.color} />
+                </div>
+                <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
+                <p className="text-sm text-apex-text-muted">{stat.label}</p>
+              </div>
+            </Wrapper>
+          )
+        })}
       </motion.div>
 
       {/* CTA principale */}
@@ -129,12 +143,12 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-3 mb-2">
               <div className="w-9 h-9 rounded-apex bg-apex-primary/15 flex items-center justify-center">
-                <Plus size={16} className="text-apex-primary" />
+                <Users size={16} className="text-apex-primary" />
               </div>
-              <p className="font-medium text-white">Nouveau patient</p>
+              <p className="font-medium text-white">Mes patients</p>
             </div>
             <p className="text-xs text-apex-text-muted">
-              Créer une fiche patient dans votre cabinet
+              Gérer vos fiches patients • {patientCount} patient{patientCount !== 1 ? 's' : ''}
             </p>
           </motion.div>
         </Link>
@@ -155,6 +169,17 @@ export default function DashboardPage() {
             </p>
           </motion.div>
         </Link>
+      </motion.div>
+
+      {/* Shortcut hint */}
+      <motion.div variants={itemVariants} className="text-center">
+        <p className="text-xs text-apex-text-muted">
+          Appuyez sur{' '}
+          <kbd className="px-1.5 py-0.5 bg-apex-surface-2 rounded text-xs font-mono border border-apex-border">
+            Ctrl+K
+          </kbd>{' '}
+          pour rechercher rapidement
+        </p>
       </motion.div>
     </motion.div>
   )

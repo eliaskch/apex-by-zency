@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
-from routers import auth
+from routers import auth, patients
 
 logger = structlog.get_logger()
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
 
     # Routers
     app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(patients.router, prefix="/api/v1")
 
     @app.get("/health", tags=["Monitoring"])
     async def health_check() -> dict:

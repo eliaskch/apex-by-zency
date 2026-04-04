@@ -25,3 +25,6 @@ class Cabinet(Base):
     practitioners: Mapped[list["Practitioner"]] = relationship(  # noqa: F821
         "Practitioner", back_populates="cabinet", lazy="selectin"
     )
+    patients: Mapped[list["Patient"]] = relationship(  # noqa: F821
+        "Patient", back_populates="cabinet", lazy="selectin"
+    )
