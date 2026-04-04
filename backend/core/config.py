@@ -13,15 +13,17 @@ class Settings(BaseSettings):
     def DEBUG(self) -> bool:
         return self.ENVIRONMENT == "development"
 
-    # Database — Render fournit une URL postgresql://, on adapte pour asyncpg
-    DATABASE_URL: str = "postgresql+asyncpg://apex:apex@localhost:5432/apex_db"
+    # Database — Render fournit une URL postgresql://, on adapte pour psycopg v3
+    DATABASE_URL: str = "postgresql+psycopg://apex:apex@localhost:5432/apex_db"
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def fix_db_url(cls, v: str) -> str:
-        # Render donne postgresql:// — SQLAlchemy async nécessite postgresql+asyncpg://
+        # Normalise vers psycopg v3 (remplace asyncpg ou bare postgresql://)
+        if v.startswith("postgresql+asyncpg://"):
+            return v.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
         if v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return v.replace("postgresql://", "postgresql+psycopg://", 1)
         return v
 
     # Redis
