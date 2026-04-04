@@ -19,11 +19,10 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def fix_db_url(cls, v: str) -> str:
-        # Normalise vers asyncpg (remplace psycopg ou bare postgresql://)
-        if v.startswith("postgresql+psycopg://"):
-            return v.replace("postgresql+psycopg://", "postgresql+asyncpg://", 1)
-        if v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Normalise vers asyncpg
+        for prefix in ("postgresql+psycopg://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+asyncpg://" + v[len(prefix):]
         return v
 
     # Redis
