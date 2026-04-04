@@ -40,24 +40,6 @@ def create_app() -> FastAPI:
             "environment": settings.ENVIRONMENT,
         }
 
-    @app.get("/db-health", tags=["Monitoring"])
-    async def db_health() -> dict:
-        from core.database import engine
-        import socket
-        try:
-            host = settings.DATABASE_URL.split("@")[1].split("/")[0].split(":")[0]
-            resolved = socket.getaddrinfo(host, 5432, 0, 0, socket.IPPROTO_TCP)
-            ips = [r[4][0] for r in resolved]
-        except Exception as e:
-            ips = [f"DNS ERROR: {e}"]
-        try:
-            async with engine.connect() as conn:
-                from sqlalchemy import text
-                result = await conn.execute(text("SELECT version()"))
-                pg_version = result.scalar()
-            return {"db": "ok", "pg_version": pg_version, "db_url_host": settings.DATABASE_URL.split("@")[1].split("/")[0], "resolved_ips": ips}
-        except Exception as e:
-            return {"db": "error", "error": str(e), "resolved_ips": ips}
 
     @app.on_event("startup")
     async def startup_event() -> None:
