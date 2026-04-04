@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: apex-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start.sh
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # à renseigner manuellement dans Render dashboard
+      - key: REDIS_URL
+        value: ""    # optionnel pour Phase 1
+      - key: SECRET_KEY
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: S3_ENDPOINT
+        value: ""
+      - key: S3_BUCKET
+        value: apex-dev
+      - key: S3_ACCESS_KEY
+        value: ""
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: ALLOWED_ORIGINS
+        sync: false  # mettre l'URL Vercel ex: https://apex-frontend.vercel.app
+
+databases:
+  - name: apex-postgres
+    databaseName: apex_db
+    user: apex
+    plan: free

@@ -1,0 +1,50 @@
+# Secrets — NE JAMAIS COMMITTER
+.env
+.env.local
+.env.prod
+.env.*.local
+backend/.env
+
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+.npm
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker volumes (locaux)
+postgres_data/
+minio_data/
+
+# Uploads locaux
+/uploads/
+/tmp/
