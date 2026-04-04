@@ -9,16 +9,17 @@ export function middleware(request: NextRequest): NextResponse {
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
   const isProtectedPath = pathname.startsWith(PROTECTED_PREFIX)
 
-  // Le token est en mémoire côté client — on vérifie le cookie refresh pour SSR
-  const hasRefreshCookie = request.cookies.has('refresh_token')
+  // Cookie posé par JS après login (domaine frontend)
+  // Le refresh_token httpOnly est sur le domaine backend — non accessible ici
+  const hasSession = request.cookies.has('apex_session')
 
-  if (isProtectedPath && !hasRefreshCookie) {
+  if (isProtectedPath && !hasSession) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  if (isPublicPath && hasRefreshCookie) {
+  if (isPublicPath && hasSession) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

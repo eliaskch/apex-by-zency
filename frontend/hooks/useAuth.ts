@@ -15,6 +15,15 @@ export function useAuth() {
     useAuthStore()
   const router = useRouter()
 
+  const setSessionCookie = () => {
+    const maxAge = 7 * 24 * 3600 // 7 jours
+    document.cookie = `apex_session=1; path=/; max-age=${maxAge}; SameSite=Lax`
+  }
+
+  const clearSessionCookie = () => {
+    document.cookie = 'apex_session=; path=/; max-age=0'
+  }
+
   const register = useCallback(
     async (payload: RegisterPayload): Promise<void> => {
       const { data } = await api.post<{ access_token: string }>('/auth/register', payload)
@@ -22,6 +31,7 @@ export function useAuth() {
 
       const { data: me } = await api.get<Practitioner>('/auth/me')
       login(me, data.access_token)
+      setSessionCookie()
       router.push('/dashboard')
     },
     [login, router]
@@ -34,6 +44,7 @@ export function useAuth() {
 
       const { data: me } = await api.get<Practitioner>('/auth/me')
       login(me, data.access_token)
+      setSessionCookie()
       router.push('/dashboard')
     },
     [login, router]
@@ -43,6 +54,7 @@ export function useAuth() {
     try {
       await api.post('/auth/logout')
     } finally {
+      clearSessionCookie()
       clearAccessToken()
       storeLogout()
       router.push('/login')

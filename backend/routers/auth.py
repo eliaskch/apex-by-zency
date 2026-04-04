@@ -27,12 +27,14 @@ security = HTTPBearer()
 logger = structlog.get_logger()
 
 REFRESH_COOKIE_NAME = "refresh_token"
+_is_prod = settings.ENVIRONMENT != "development"
 REFRESH_COOKIE_OPTIONS = {
     "httponly": True,
-    "secure": settings.ENVIRONMENT != "development",
-    "samesite": "lax",
+    "secure": _is_prod,
+    # SameSite=None requis pour les requêtes cross-origin (frontend Vercel → backend Render)
+    "samesite": "none" if _is_prod else "lax",
     "max_age": settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
-    "path": "/auth",
+    "path": "/api/v1/auth",  # chemin complet pour cross-origin
 }
 
 
@@ -115,7 +117,7 @@ async def refresh(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(response: Response) -> None:
     """Déconnexion — supprime le cookie de refresh."""
-    response.delete_cookie(REFRESH_COOKIE_NAME, path="/auth")
+    response.delete_cookie(REFRESH_COOKIE_NAME, path="/api/v1/auth", samesite="none", secure=True)
 
 
 @router.get("/me", response_model=PractitionerMe)
