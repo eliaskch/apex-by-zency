@@ -3,10 +3,10 @@ from sqlalchemy.orm import DeclarativeBase
 
 from core.config import settings
 
-# Pour Render PostgreSQL
+# Pour Render PostgreSQL externe (cross-region), SSL avec vérification complète du certificat
 _connect_args: dict = {}
 if settings.ENVIRONMENT != "development":
-    _connect_args["sslmode"] = "disable"
+    _connect_args["ssl"] = True  # asyncpg: SSL avec CA système (Render a un cert valide)
 
 engine = create_async_engine(
     settings.DATABASE_URL,
