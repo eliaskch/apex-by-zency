@@ -1,10 +1,12 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+// En production, l'API passe par le proxy Vercel (same-origin → pas de pb cookies cross-origin)
+// En dev, on pointe directement vers le backend local
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
-  withCredentials: true, // pour les cookies httpOnly
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,7 +23,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 // Refresh automatique si 401
 let isRefreshing = false
-let refreshQueue: Array<(token: string) => void> = []
+let refreshQueue: Array<(token: string | null) => void> = []
 
 api.interceptors.response.use(
   (response) => response,
@@ -30,10 +32,14 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           refreshQueue.push((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`
-            resolve(api(originalRequest))
+            if (!token) {
+              reject(error)
+            } else {
+              originalRequest.headers.Authorization = `Bearer ${token}`
+              resolve(api(originalRequest))
+            }
           })
         })
       }
@@ -42,8 +48,11 @@ api.interceptors.response.use(
       isRefreshing = true
 
       try {
+        const refreshUrl = API_URL
+          ? `${API_URL}/api/v1/auth/refresh`
+          : '/api/v1/auth/refresh'
         const { data } = await axios.post(
-          `${API_URL}/api/v1/auth/refresh`,
+          refreshUrl,
           {},
           { withCredentials: true }
         )
@@ -55,12 +64,21 @@ api.interceptors.response.use(
 
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return api(originalRequest)
-      } catch {
+      } catch (err) {
         clearAccessToken()
+        // CRUCIAL: Delete the middleware session cookie to break the redirect loop
+        if (typeof document !== 'undefined') {
+          document.cookie = 'apex_session=; path=/; max-age=0'
+        }
+        
+        // Reject all queued requests safely
+        refreshQueue.forEach((cb) => cb(null))
+        refreshQueue = []
+        
         if (typeof window !== 'undefined') {
           window.location.href = '/login'
         }
-        return Promise.reject(error)
+        return Promise.reject(err)
       } finally {
         isRefreshing = false
       }

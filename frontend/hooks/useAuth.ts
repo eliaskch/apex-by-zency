@@ -6,7 +6,7 @@
  */
 import { useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { api, setAccessToken, clearAccessToken } from '@/lib/api'
+import { api, setAccessToken, clearAccessToken, getAccessToken } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import type { LoginPayload, RegisterPayload, Practitioner } from '@/lib/types'
 
@@ -65,10 +65,12 @@ export function useAuth() {
     try {
       setLoading(true)
       const { data } = await api.get<Practitioner>('/auth/me')
-      // On récupère le token depuis la mémoire (déjà stocké)
-      const { getAccessToken } = await import('@/lib/api')
-      login(data, getAccessToken() ?? '')
+      const token = getAccessToken() ?? ''
+      login(data, token)
     } catch {
+      // Auth échouée (refresh raté) — nettoyer pour éviter une boucle redirect
+      clearSessionCookie()
+      clearAccessToken()
       storeLogout()
     } finally {
       setLoading(false)
