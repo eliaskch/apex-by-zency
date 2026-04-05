@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import {
@@ -15,11 +15,17 @@ import {
   Plus,
   Calendar,
   Trash2,
+  Mic,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { usePatient, useDeletePatient } from '@/hooks/usePatients'
+import { usePatientConsultations } from '@/hooks/useConsultation'
 import { PatientDrawer } from '@/components/patient/PatientDrawer'
 import { Button } from '@/components/ui/button'
-import { formatDate, getInitials } from '@/lib/utils'
+import { formatDate, formatDuration, getInitials } from '@/lib/utils'
+import type { ConsultationStatus } from '@/lib/types'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -69,10 +75,10 @@ function genderLabel(g: string | null | undefined): string {
 
 export default function PatientDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const patientId = params.id as string
   const { data: patient, isLoading } = usePatient(patientId)
   const deleteMutation = useDeletePatient()
+  const { data: consultations } = usePatientConsultations(patientId)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const bgColor = useMemo(() => avatarColor(patientId), [patientId])
@@ -257,29 +263,73 @@ export default function PatientDetailPage() {
           </div>
         </motion.div>
 
-        {/* Right column — Consultations placeholder */}
+        {/* Right column — Consultations */}
         <motion.div
           variants={itemVariants}
           className="col-span-2 glass rounded-apex-xl border border-apex-border p-6"
         >
-          <h3 className="text-lg font-semibold text-white mb-6">
-            Historique des consultations
-          </h3>
-
-          <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-full bg-apex-surface-2 flex items-center justify-center mx-auto mb-4">
-              <Calendar size={24} className="text-apex-text-muted" />
-            </div>
-            <p className="text-apex-text-muted text-sm mb-6">
-              Aucune consultation pour l&apos;instant
-            </p>
-            <Link href="/dashboard/consultation/new">
-              <Button>
-                <Plus size={16} className="mr-2" />
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-white">
+              Historique des consultations
+            </h3>
+            <Link href={`/dashboard/patients/${patientId}/consultation/new`}>
+              <Button size="sm">
+                <Plus size={14} className="mr-2" />
                 Nouvelle consultation
               </Button>
             </Link>
           </div>
+
+          {(!consultations || consultations.length === 0) ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-full bg-apex-surface-2 flex items-center justify-center mx-auto mb-4">
+                <Calendar size={24} className="text-apex-text-muted" />
+              </div>
+              <p className="text-apex-text-muted text-sm mb-6">
+                Aucune consultation pour l&apos;instant
+              </p>
+              <Link href={`/dashboard/patients/${patientId}/consultation/new`}>
+                <Button>
+                  <Mic size={16} className="mr-2" />
+                  Démarrer une consultation
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {consultations.map((c) => {
+                const statusConfig: Record<ConsultationStatus, { label: string; color: string; icon: typeof CheckCircle2 }> = {
+                  idle: { label: 'En attente', color: 'text-apex-text-muted', icon: Calendar },
+                  recording: { label: 'Enregistrement', color: 'text-red-400', icon: Mic },
+                  uploading: { label: 'Upload', color: 'text-apex-primary', icon: Loader2 },
+                  transcribing: { label: 'Transcription', color: 'text-amber-400', icon: Loader2 },
+                  generating: { label: 'Génération IA', color: 'text-purple-400', icon: Loader2 },
+                  done: { label: 'Terminée', color: 'text-apex-success', icon: CheckCircle2 },
+                  error: { label: 'Erreur', color: 'text-apex-error', icon: AlertCircle },
+                }
+                const sc = statusConfig[c.status as ConsultationStatus] || statusConfig.idle
+                const StatusIcon = sc.icon
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-4 p-4 rounded-apex bg-apex-surface-2/50 border border-apex-border/50 hover:border-apex-border transition-colors"
+                  >
+                    <div className={`shrink-0 ${sc.color}`}>
+                      <StatusIcon size={18} className={c.status === 'transcribing' || c.status === 'generating' ? 'animate-spin' : ''} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white capitalize">{c.act_type.replace('_', ' ')}</p>
+                      <p className="text-xs text-apex-text-muted">
+                        {formatDate(c.recorded_at)}
+                        {c.duration_seconds > 0 && ` · ${formatDuration(c.duration_seconds)}`}
+                      </p>
+                    </div>
+                    <span className={`text-xs font-medium ${sc.color}`}>{sc.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </motion.div>
       </div>
 

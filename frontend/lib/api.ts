@@ -84,3 +84,31 @@ export function setAccessToken(token: string): void {
 export function clearAccessToken(): void {
   _accessToken = null
 }
+
+/**
+ * Upload un fichier audio pour une consultation.
+ * Supporte une callback de progression (0-100).
+ */
+export async function uploadAudio(
+  consultationId: string,
+  audioBlob: Blob,
+  onProgress?: (percent: number) => void
+) {
+  const formData = new FormData()
+  const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm'
+  formData.append('file', audioBlob, `audio.${ext}`)
+
+  const response = await api.post(
+    `/consultations/${consultationId}/upload-audio`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress(Math.round((event.loaded / event.total) * 100))
+        }
+      },
+    }
+  )
+  return response.data
+}

@@ -38,3 +38,43 @@ export type ConsultationStatus =
   | 'generating'
   | 'done'
   | 'error'
+
+export interface Consultation {
+  id: string
+  patient_id: string
+  practitioner_id: string
+  recorded_at: string
+  audio_url: string | null
+  duration_seconds: number
+  status: ConsultationStatus
+  act_type: string
+  specialty: string
+  transcript: string | null
+}
+
+export interface ConsultationListItem {
+  id: string
+  patient_id: string
+  practitioner_id: string
+  recorded_at: string
+  status: ConsultationStatus
+  act_type: string
+  specialty: string
+  duration_seconds: number
+}
+
+export interface ConsultationCreate {
+  patient_id: string
+  act_type: string
+  specialty?: string
+}
+
+export interface Document {
+  id: string
+  consultation_id: string
+  doc_type: string
+  content_json: Record<string, unknown> | null
+  pdf_url: string | null
+  version: number
+  created_at: string
+}

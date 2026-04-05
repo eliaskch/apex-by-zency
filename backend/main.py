@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
-from routers import auth, patients
+from routers import auth, consultations, patients
 
 logger = structlog.get_logger()
 
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     # Routers
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(patients.router, prefix="/api/v1")
+    app.include_router(consultations.router, prefix="/api/v1")
 
     @app.get("/health", tags=["Monitoring"])
     async def health_check() -> dict:
@@ -45,6 +46,13 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_event() -> None:
         logger.info("apex.startup", version=settings.APP_VERSION, env=settings.ENVIRONMENT)
+        # Créer les buckets S3 si nécessaire (dev)
+        if settings.ENVIRONMENT == "development":
+            from core.storage import ensure_buckets
+            try:
+                ensure_buckets()
+            except Exception as e:
+                logger.warning("storage.init_error", error=str(e))
 
     return app
 
