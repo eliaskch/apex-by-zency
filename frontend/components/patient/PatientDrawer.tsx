@@ -39,6 +39,7 @@ export function PatientDrawer({ open, onClose, patient }: PatientDrawerProps) {
   const updateMutation = useUpdatePatient(patient?.id ?? '')
   const [medicalOpen, setMedicalOpen] = useState(false)
   const [allergyInput, setAllergyInput] = useState('')
+  const [serverError, setServerError] = useState<string | null>(null)
 
   const {
     register,
@@ -116,6 +117,7 @@ export function PatientDrawer({ open, onClose, patient }: PatientDrawerProps) {
   }
 
   const onSubmit = async (data: PatientFormData) => {
+    setServerError(null)
     try {
       // Clean empty strings to null
       const cleaned = {
@@ -136,8 +138,9 @@ export function PatientDrawer({ open, onClose, patient }: PatientDrawerProps) {
         await createMutation.mutateAsync(cleaned)
       }
       onClose()
-    } catch {
-      // error handled by mutation
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setServerError(detail ?? 'Une erreur est survenue, veuillez réessayer.')
     }
   }
 
@@ -368,7 +371,11 @@ export function PatientDrawer({ open, onClose, patient }: PatientDrawerProps) {
             </form>
 
             {/* Footer */}
-            <div className="p-6 border-t border-apex-border flex items-center justify-end gap-3">
+            <div className="p-6 border-t border-apex-border space-y-3">
+              {serverError && (
+                <p className="text-sm text-[#FF6B35] text-center">{serverError}</p>
+              )}
+              <div className="flex items-center justify-end gap-3">
               <Button variant="ghost" onClick={onClose} type="button">
                 Annuler
               </Button>
@@ -378,6 +385,7 @@ export function PatientDrawer({ open, onClose, patient }: PatientDrawerProps) {
               >
                 {isEdit ? 'Enregistrer' : 'Créer le patient →'}
               </Button>
+              </div>
             </div>
           </motion.div>
         </>

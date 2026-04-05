@@ -23,7 +23,7 @@ from services.auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 logger = structlog.get_logger()
 
 REFRESH_COOKIE_NAME = "refresh_token"
@@ -122,9 +122,15 @@ async def logout(response: Response) -> None:
 
 @router.get("/me", response_model=PractitionerMe)
 async def me(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> PractitionerMe:
     """Retourner le profil du praticien connecté."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Non authentifié",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     practitioner = await get_practitioner_from_token(credentials.credentials, db)
     return PractitionerMe.model_validate(practitioner)

@@ -28,14 +28,20 @@ from services.patient import (
 )
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_practitioner(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> Practitioner:
     """Dépendance : extraire le praticien connecté depuis le JWT."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Non authentifié",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return await get_practitioner_from_token(credentials.credentials, db)
 
 
