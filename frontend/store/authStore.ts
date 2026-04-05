@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { setAccessToken, clearAccessToken } from '@/lib/api'
 import type { Practitioner } from '@/lib/types'
 
 interface AuthState {
@@ -16,13 +17,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   login: (practitioner, accessToken) => {
-    // Stocker le token en mémoire via le module api
-    import('@/lib/api').then(({ setAccessToken }) => setAccessToken(accessToken))
+    setAccessToken(accessToken)
     set({ practitioner, isAuthenticated: true, isLoading: false })
   },
 
   logout: () => {
-    import('@/lib/api').then(({ clearAccessToken }) => clearAccessToken())
+    clearAccessToken()
     set({ practitioner: null, isAuthenticated: false, isLoading: false })
   },
 

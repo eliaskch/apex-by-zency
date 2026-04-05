@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.database import get_db
-from core.storage import PDF_BUCKET, get_presigned_url, upload_audio
+from core.storage import PDF_BUCKET, get_presigned_url, upload_audio, upload_pdf
 from core.websocket import manager
 from models.consultation import Consultation
 from models.document import Document
@@ -23,6 +23,9 @@ from schemas.consultation import (
     ConsultationListItem,
     ConsultationSchema,
     DocumentSchema,
+    DocumentUpdateRequest,
+    RecentConsultation,
+    PatientSummary,
 )
 from services.auth import get_practitioner_from_token
 
@@ -148,6 +151,52 @@ async def list_consultations(
     return [ConsultationListItem.model_validate(c) for c in result.scalars().all()]
 
 
+@router.get("/recent", response_model=list[RecentConsultation])
+async def recent_consultations(
+    limit: int = 10,
+    practitioner: Practitioner = Depends(get_current_practitioner),
+    db: AsyncSession = Depends(get_db),
+) -> list[RecentConsultation]:
+    """Dernières consultations du cabinet avec info patient et document."""
+    result = await db.execute(
+        select(Consultation)
+        .join(Patient, Consultation.patient_id == Patient.id)
+        .where(Patient.cabinet_id == practitioner.cabinet_id)
+        .order_by(Consultation.recorded_at.desc())
+        .limit(limit)
+    )
+    consultations = result.scalars().all()
+
+    items = []
+    for c in consultations:
+        doc_result = await db.execute(
+            select(Document)
+            .where(Document.consultation_id == c.id)
+            .order_by(Document.version.desc())
+            .limit(1)
+        )
+        doc = doc_result.scalar_one_or_none()
+
+        pdf_url = None
+        if doc and doc.pdf_url:
+            pdf_url = get_presigned_url(PDF_BUCKET, doc.pdf_url)
+
+        items.append(
+            RecentConsultation(
+                id=c.id,
+                patient_id=c.patient_id,
+                recorded_at=c.recorded_at,
+                status=c.status,
+                act_type=c.act_type,
+                specialty=c.specialty,
+                patient=PatientSummary.model_validate(c.patient),
+                has_document=doc is not None,
+                pdf_url=pdf_url,
+            )
+        )
+    return items
+
+
 @router.get("/{consultation_id}", response_model=ConsultationSchema)
 async def get_consultation(
     consultation_id: uuid.UUID,
@@ -191,6 +240,71 @@ async def get_consultation_document(
     document = doc_result.scalar_one_or_none()
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document non encore généré")
+
+    doc_schema = DocumentSchema.model_validate(document)
+    if document.pdf_url:
+        doc_schema.pdf_url = get_presigned_url(PDF_BUCKET, document.pdf_url)
+
+    return doc_schema
+
+
+@router.put("/{consultation_id}/document", response_model=DocumentSchema)
+async def update_consultation_document(
+    consultation_id: uuid.UUID,
+    body: DocumentUpdateRequest,
+    practitioner: Practitioner = Depends(get_current_practitioner),
+    db: AsyncSession = Depends(get_db),
+) -> DocumentSchema:
+    """Met à jour le content_json du document et régénère le PDF."""
+    # Vérifier accès
+    result = await db.execute(
+        select(Consultation)
+        .join(Patient, Consultation.patient_id == Patient.id)
+        .where(
+            Consultation.id == consultation_id,
+            Patient.cabinet_id == practitioner.cabinet_id,
+        )
+    )
+    consultation = result.scalar_one_or_none()
+    if not consultation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consultation non trouvée")
+
+    # Récupérer le dernier document
+    doc_result = await db.execute(
+        select(Document)
+        .where(Document.consultation_id == consultation_id)
+        .order_by(Document.version.desc())
+    )
+    document = doc_result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document non encore généré")
+
+    # Mettre à jour le JSON et incrémenter la version
+    document.content_json = body.content_json
+    document.version += 1
+
+    # Régénérer le PDF
+    pdf_key = None
+    try:
+        from weasyprint import HTML
+        from tasks.pipeline import _generate_pdf_html
+        from services.prompts.dentaire import DENTAL_PROMPTS
+
+        patient = consultation.patient
+        patient_name = f"{patient.last_name} {patient.first_name}" if patient else "Inconnu"
+        act_label = DENTAL_PROMPTS.get(consultation.act_type, {}).get("label", consultation.act_type)
+
+        html_content = _generate_pdf_html(body.content_json, patient_name, act_label)
+        pdf_bytes = HTML(string=html_content).write_pdf()
+        pdf_key = upload_pdf(pdf_bytes, str(consultation_id))
+        document.pdf_url = pdf_key
+        logger.info("document.pdf_regenerated", consultation_id=str(consultation_id), version=document.version)
+    except ImportError:
+        logger.info("document.pdf_skipped", reason="weasyprint not installed")
+    except Exception as e:
+        logger.warning("document.pdf_regen_error", error=str(e))
+
+    await db.flush()
 
     doc_schema = DocumentSchema.model_validate(document)
     if document.pdf_url:

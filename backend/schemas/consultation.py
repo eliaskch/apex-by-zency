@@ -58,3 +58,29 @@ class DocumentSchema(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DocumentUpdateRequest(BaseModel):
+    content_json: dict
+
+
+class PatientSummary(BaseModel):
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+
+    model_config = {"from_attributes": True}
+
+
+class RecentConsultation(BaseModel):
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    recorded_at: datetime
+    status: str
+    act_type: str
+    specialty: str
+    patient: PatientSummary
+    has_document: bool
+    pdf_url: str | None = None
+
+    model_config = {"from_attributes": True}

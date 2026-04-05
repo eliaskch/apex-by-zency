@@ -78,3 +78,28 @@ export interface Document {
   version: number
   created_at: string
 }
+
+export interface DashboardMetrics {
+  consultations_count: number
+  documents_count: number
+  time_saved_minutes: number
+  patients_count: number
+}
+
+export interface PatientSummary {
+  id: string
+  first_name: string
+  last_name: string
+}
+
+export interface RecentConsultation {
+  id: string
+  patient_id: string
+  recorded_at: string
+  status: ConsultationStatus
+  act_type: string
+  specialty: string
+  patient: PatientSummary
+  has_document: boolean
+  pdf_url: string | null
+}

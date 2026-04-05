@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
 
     # CORS — accepte une chaîne séparée par des virgules ou une liste
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000"
 
     def get_allowed_origins(self) -> list[str]:
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]

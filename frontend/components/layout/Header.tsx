@@ -8,10 +8,24 @@ import { useAuth } from '@/hooks/useAuth'
 import { getInitials } from '@/lib/utils'
 
 export function Header() {
-  const { practitioner, logout } = useAuth()
+  const { practitioner, isLoading, logout } = useAuth()
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  if (!practitioner) return null
+  if (!practitioner) {
+    return (
+      <header className="h-16 border-b border-apex-border bg-apex-dark/80 backdrop-blur-sm flex items-center justify-end px-6">
+        {isLoading && (
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-apex-surface-2 animate-pulse" />
+            <div className="space-y-1.5">
+              <div className="w-20 h-3 bg-apex-surface-2 rounded animate-pulse" />
+              <div className="w-28 h-2.5 bg-apex-surface-2 rounded animate-pulse" />
+            </div>
+          </div>
+        )}
+      </header>
+    )
+  }
 
   const initials = getInitials(practitioner.first_name, practitioner.last_name)
 

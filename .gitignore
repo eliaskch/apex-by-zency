@@ -45,6 +45,9 @@ Thumbs.db
 postgres_data/
 minio_data/
 
+# SSL certificates
+nginx/ssl/
+
 # Uploads locaux
 /uploads/
 /tmp/

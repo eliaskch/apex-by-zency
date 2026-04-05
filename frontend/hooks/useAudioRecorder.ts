@@ -66,25 +66,40 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     chunksRef.current = []
 
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("L'API microphone n'est pas supportée dans ce navigateur. Assurez-vous d'être en HTTPS (ou localhost).")
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      // WebAudio AnalyserNode pour le volume
-      const audioCtx = new AudioContext()
-      const source = audioCtx.createMediaStreamSource(stream)
-      const analyser = audioCtx.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-      analyserRef.current = analyser
+      // WebAudio AnalyserNode pour le volume (avec fallback Safari)
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      if (AudioContextClass) {
+        try {
+          const audioCtx = new AudioContextClass()
+          const source = audioCtx.createMediaStreamSource(stream)
+          const analyser = audioCtx.createAnalyser()
+          analyser.fftSize = 256
+          source.connect(analyser)
+          analyserRef.current = analyser
+          updateVolume()
+        } catch (e) {
+          console.warn("L'analyseur de volume n'a pas pu être initialisé :", e)
+        }
+      }
 
-      // Choisir le format supporté
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-          ? 'audio/mp4'
-          : 'audio/webm'
+      // Choisir le format supporté en toute sécurité
+      let options: MediaRecorderOptions = {}
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        options = { mimeType: 'audio/webm;codecs=opus' }
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        options = { mimeType: 'audio/mp4' }
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        options = { mimeType: 'audio/webm' }
+      }
 
-      const recorder = new MediaRecorder(stream, { mimeType })
+      const recorder = new MediaRecorder(stream, options)
       mediaRecorderRef.current = recorder
 
       recorder.ondataavailable = (e) => {
@@ -94,7 +109,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       }
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType })
+        const mime = recorder.mimeType || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: mime })
         if (resolveStopRef.current) {
           resolveStopRef.current(blob)
           resolveStopRef.current = null
@@ -109,17 +125,18 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         setDuration((d) => d + 1)
       }, 1000)
 
-      // Démarrer l'animation du volume
-      updateVolume()
-    } catch (err) {
+    } catch (err: any) {
+      console.error("Erreur hook audio:", err)
       if (err instanceof DOMException && err.name === 'NotAllowedError') {
         setError(
-          "Accès au microphone refusé. Veuillez autoriser l'accès dans les paramètres de votre navigateur."
+          "Accès au microphone refusé. Le navigateur a bloqué l'accès. Veuillez cliquer sur l'icône de cadenas dans la barre d'adresse puis autoriser le microphone."
         )
       } else if (err instanceof DOMException && err.name === 'NotFoundError') {
-        setError('Aucun microphone détecté sur cet appareil.')
+        setError(
+          "Aucun microphone détecté. Votre navigateur ne trouve pas de périphérique audio. Branchez un micro et réessayez."
+        )
       } else {
-        setError("Erreur lors de l'accès au microphone.")
+        setError(err.message || "Erreur lors de l'accès au microphone.")
       }
     }
   }, [updateVolume])

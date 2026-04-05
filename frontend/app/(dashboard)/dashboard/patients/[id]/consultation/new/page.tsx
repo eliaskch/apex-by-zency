@@ -125,30 +125,39 @@ export default function NewConsultationPage() {
     return socket.progress
   }, [currentStatus, uploadProgress, socket.progress])
 
-  // Redirection automatique vers le document quand c'est done
+  // Redirection automatique vers l'éditeur quand c'est done
   useEffect(() => {
     if (currentStatus === 'done' && consultationId) {
       const timer = setTimeout(() => {
-        router.push(`/dashboard/patients/${patientId}`)
+        router.push(`/dashboard/patients/${patientId}/consultation/${consultationId}`)
       }, 2000)
       return () => clearTimeout(timer)
     }
   }, [currentStatus, consultationId, patientId, router])
 
+  const [serverError, setServerError] = useState<string | null>(null)
+
   const handleStartRecording = useCallback(async () => {
-    // 1. Créer la consultation côté backend
-    const consultation = await createConsultation.mutateAsync({
-      patient_id: patientId,
-      act_type: actType,
-      specialty: 'dentaire',
-    })
-    setConsultationId(consultation.id)
+    setServerError(null)
+    try {
+      // 1. Créer la consultation côté backend
+      const consultation = await createConsultation.mutateAsync({
+        patient_id: patientId,
+        act_type: actType,
+        specialty: 'dentaire',
+      })
+      setConsultationId(consultation.id)
 
-    // 2. Connecter le WebSocket
-    socket.connect(consultation.id)
+      // 2. Connecter le WebSocket
+      socket.connect(consultation.id)
 
-    // 3. Démarrer l'enregistrement audio
-    await recorder.start()
+      // 3. Démarrer l'enregistrement audio
+      await recorder.start()
+    } catch (err: any) {
+      console.error("Erreur démarrage consultation:", err)
+      const detail = err?.response?.data?.detail
+      setServerError(detail || "Impossible d'initialiser la consultation. Vérifiez votre connexion au serveur.")
+    }
   }, [patientId, actType, createConsultation, socket, recorder])
 
   const handleStopRecording = useCallback(async () => {
@@ -397,9 +406,10 @@ export default function NewConsultationPage() {
         </div>
       </motion.div>
 
-      {/* Error from recorder */}
-      {recorder.error && (
+      {/* Error from recorder or api */}
+      {(recorder.error || serverError) && (
         <motion.div
+           // @ts-ignore: AnimatePresence requires keys which is fine here
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className="glass rounded-apex border border-apex-error/30 bg-apex-error/5 p-4"
@@ -407,8 +417,8 @@ export default function NewConsultationPage() {
           <div className="flex items-start gap-3">
             <AlertCircle size={18} className="text-apex-error shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-apex-error font-medium">Erreur microphone</p>
-              <p className="text-xs text-apex-text-muted mt-1">{recorder.error}</p>
+              <p className="text-sm text-apex-error font-medium">Erreur</p>
+              <p className="text-xs text-apex-text-muted mt-1">{recorder.error || serverError}</p>
             </div>
           </div>
         </motion.div>
